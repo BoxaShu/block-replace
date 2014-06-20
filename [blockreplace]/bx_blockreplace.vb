@@ -67,16 +67,22 @@ Public Class acad__boxashu
 
         If listBlocksToReplace.Count > 0 Then
             Dim openPathDialog As New Windows.Forms.FolderBrowserDialog()
-            openPathDialog.RootFolder = Environment.SpecialFolder.MyComputer
+            openPathDialog.RootFolder = Environment.SpecialFolder.DesktopDirectory
+            ' openPathDialog.RootFolder = Environment.SpecialFolder.NetworkShortcuts
             openPathDialog.ShowDialog()
             Dim PATH As String = openPathDialog.SelectedPath
+            If PATH <> "" Then
+                acEd.WriteMessage(CrLf & "Выбран каталог {0}", PATH)
+            Else
+                acEd.WriteMessage(CrLf & "Ошибка при выборе каталога! Программа завершена.")
+                Exit Sub
+            End If
 
-            acEd.WriteMessage(CrLf & "Выбран каталог {0}", PATH)
 
             Dim files As String()
             Try
                 files = System.IO.Directory.GetFiles(PATH, "*.dwg", IO.SearchOption.AllDirectories)
-            Catch ex As Exception
+            Catch ex As System.ArgumentException
                 acEd.WriteMessage(CrLf & "Ошибка при поиске файлов! Программа завершена.")
                 acEd.WriteMessage(CrLf & ex.Message)
                 Exit Sub
@@ -98,12 +104,15 @@ Public Class acad__boxashu
                 acEd.WriteMessage(CrLf & "В выбранном каталоге нет dwg файлов! Программа завершена.")
                 Exit Sub
             End If
+
+            acEd.WriteMessage(CrLf & "В каталоге найдено файлов с блоками: {0}", listBlock.Count)
+
         Else
-            acEd.WriteMessage(CrLf & "Блоки не выбраны! Программа завершена.")
+            acEd.WriteMessage(CrLf & "Блоки для замены не выбраны! Программа завершена.")
             Exit Sub
         End If
 
-        acEd.WriteMessage(CrLf & "В каталоге найдено файлов с блоками: {0}", listBlock.Count)
+
 
         '' тут читаем dwg файл с блоками и копируем в описание блока атрибуты из файла
         pm.SetLimit(listBlocksToReplace.Count)
@@ -112,11 +121,25 @@ Public Class acad__boxashu
 
         For Each i As String In listBlocksToReplace
             Dim blockID As ObjectId
+            Dim attDic As New Dictionary(Of String, String)
             Using acTrans As Transaction = acCurDb.TransactionManager.StartTransaction()
                 Dim acBlockTable As BlockTable = CType(acTrans.GetObject(acCurDb.BlockTableId, _
                                                                OpenMode.ForRead), BlockTable)
                 Dim acBlockTableRecord As BlockTableRecord = CType(acTrans.GetObject(acBlockTable.Item(i), _
                                                                OpenMode.ForWrite), BlockTableRecord)
+
+                If acBlockTableRecord.HasAttributeDefinitions = True Then
+                    For Each id As ObjectId In acBlockTableRecord
+                        Dim obj As DBObject = acTrans.GetObject(id, OpenMode.ForRead)
+                        If TypeOf obj Is AttributeDefinition Then
+                            Dim ent1 As AttributeDefinition = CType(obj, AttributeDefinition)
+
+                            If attDic.ContainsKey(ent1.Tag) <> True Then
+                                attDic.Add(ent1.Tag, ent1.TextString)
+                            End If
+                        End If
+                    Next
+                End If
 
                 blockID = acBlockTableRecord.ObjectId
                 ' Сохранение нового объекта в базе данных
@@ -126,6 +149,7 @@ Public Class acad__boxashu
 
 
             Try
+                Dim izm As Boolean = False
                 If listBlock.ContainsValue(i) = True Then
 
                     Dim SourcePath As String = (From q In listBlock Where q.Value = i Select q.Key).First.ToString
@@ -161,11 +185,23 @@ Public Class acad__boxashu
                                     If Not IsDBNull(ent1) Then
                                         If TypeOf ent1 Is AttributeDefinition Then
 
-                                            'Dim acAtt As AttributeDefinition = CType(ent1, AttributeDefinition)
-                                            'acAttrCallection.Add(acAtt)
-                                            sourceIds.Add(id)
+                                            'sourceIds.Add(id)
+
+                                            Dim ent0 As AttributeDefinition = CType(ent1, AttributeDefinition)
+                                            If attDic.ContainsKey(ent0.Tag) = True Then
+                                                acEd.WriteMessage(CrLf & "В блоке {0}, выявлен конфликт атрибутов {1}." & _
+                                                                 " Добавление данного атрибута пропущено.", i, ent0.Tag)
+                                            Else
+                                                'Dim acAtt As AttributeDefinition = CType(ent1, AttributeDefinition)
+                                                'acAttrCallection.Add(acAtt)
+                                                sourceIds.Add(id)
+                                            End If
+
                                         End If
                                     End If
+
+                                    'тут нужно добавить проверку блока, который меняем, 
+                                    'на наличие в нем аттрибутов и их значения
 
                                 Catch ex As Autodesk.AutoCAD.Runtime.Exception
                                     acEd.WriteMessage(CrLf & "Ошибка при чтении блока из файла {0}! Программа завершена.", SourcePath)
@@ -174,15 +210,23 @@ Public Class acad__boxashu
                                 End Try
                             Next
                             'next prepare to deepclone the recorded ids to the destdb
-                            Dim mapping As IdMapping = New IdMapping()
-                            'now clone the objects into the destdb
-                            dbSource.WblockCloneObjects(sourceIds, destDbMsId, mapping, DuplicateRecordCloning.Replace, False)
+                            If sourceIds.Count > 0 Then
+                                Dim mapping As IdMapping = New IdMapping()
+                                'now clone the objects into the destdb
+                                dbSource.WblockCloneObjects(sourceIds, destDbMsId, mapping, DuplicateRecordCloning.Replace, False)
+                                izm = True
+                            End If
+
                             tm.Commit()
                         End Using
                     End Using
 
                 End If
-                correctBlock = correctBlock + 1
+
+                If izm Then
+                    correctBlock = correctBlock + 1
+                End If
+
 
             Catch ex As Autodesk.AutoCAD.Runtime.Exception
                 acEd.WriteMessage(CrLf & "Ошибка при изменении блока {0}! Программа завершена.", i)
@@ -192,47 +236,7 @@ Public Class acad__boxashu
             pm.MeterProgress()
         Next
         pm.Stop()
+        acEd.WriteMessage(CrLf & "____________________")
         acEd.WriteMessage(CrLf & "Изменено блоков: {0}", correctBlock)
     End Sub
-
-
-    <CommandMethod("bx_t")> _
-    Public Sub bx_t()
-
-        '' Получениеn текущего документа и базы данных
-        Dim acDoc As Document = Application.DocumentManager.MdiActiveDocument
-        Dim acCurDb As Database = acDoc.Database
-        Dim acEd As Editor = acDoc.Editor
-
-
-        '' Старт транзакции
-        Using acTrans As Transaction = acCurDb.TransactionManager.StartTransaction()
-            'Выбираем только атрибуты
-            Dim acTypValAr(0) As TypedValue
-            acTypValAr.SetValue(New TypedValue(DxfCode.Start, "*"), 0)
-            '' Назначение критериев фильтра объекту SelectionFilter
-            Dim acSelFtr As SelectionFilter = New SelectionFilter(acTypValAr)
-            '' Запрос выбора объектов в области чертежа
-            Dim acSSPrompt As PromptSelectionResult = acDoc.Editor.GetSelection(acSelFtr)
-            '' Если статус запроса равен OK, объекты выбраны
-            If acSSPrompt.Status <> PromptStatus.OK Then
-                Exit Sub
-            End If
-            Dim acSSet As SelectionSet = acSSPrompt.Value
-            '' Перебор объектов в наборе
-            For Each acSSObj As SelectedObject In acSSet
-                '' Проверка, нужно убедится в правильности полученного объекта
-                If Not IsDBNull(acSSObj) Then
-                    '' Открытие объекта для записи
-                    Dim acEnt As Entity = CType(acTrans.GetObject(acSSObj.ObjectId, _
-                                                            OpenMode.ForRead), Entity)
-
-                End If
-            Next
-            ' Сохранение нового объекта в базе данных
-            acTrans.Commit()
-            ' Очистка транзакции
-        End Using
-    End Sub
-
 End Class
