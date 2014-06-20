@@ -13,19 +13,12 @@ Public Class acad__boxashu
     Public Sub bx_blockreplace()
 
 
-#If Debug <> True Then
-        Dim ver As String = My.Application.Info.Version.ToString
-        If sec.CheckVER("http://experement.spb.ru/", ver, "bx_blockreplace") = 1 And sec.coat = 21 Then
-        Else
-            Exit Sub
-        End If
-#End If
-
         '' Получениеn текущего документа и базы данных
         Dim acDoc As Document = Application.DocumentManager.MdiActiveDocument
         Dim acCurDb As Database = acDoc.Database
         Dim acEd As Editor = acDoc.Editor
 
+        Dim pm As ProgressMeter = New ProgressMeter()
 
 
         'тут лежит список с именами блоков которые нужно поменять
@@ -70,7 +63,7 @@ Public Class acad__boxashu
             acTrans.Commit()
             ' Очистка транзакции
         End Using
-
+        acEd.WriteMessage(CrLf & "Выбрано блоков: {0}", listBlocksToReplace.Count)
 
         If listBlocksToReplace.Count > 0 Then
             Dim openPathDialog As New Windows.Forms.FolderBrowserDialog()
@@ -84,32 +77,41 @@ Public Class acad__boxashu
             Try
                 files = System.IO.Directory.GetFiles(PATH, "*.dwg", IO.SearchOption.AllDirectories)
             Catch ex As Exception
-                acEd.WriteMessage(CrLf & "Ошибка при поиске файлов!")
+                acEd.WriteMessage(CrLf & "Ошибка при поиске файлов! Программа завершена.")
                 acEd.WriteMessage(CrLf & ex.Message)
+                Exit Sub
             End Try
 
 
             If files.Count > 0 Then
+                pm.SetLimit(files.Count)
+                pm.Start("Формирую список файловю")
                 For Each f As String In files
                     Dim fil As System.IO.FileInfo = New System.IO.FileInfo(f)
                     Dim fileName As String = fil.Name.Substring(0, fil.Name.Length - fil.Extension.Length)
                     'acEd.WriteMessage(CrLf & "Доступны файлы {0}, путь до файла {1}", fileName, f)
                     listBlock.Add(f, fileName)
+                    pm.MeterProgress()
                 Next
+                pm.Stop()
             Else
                 acEd.WriteMessage(CrLf & "В выбранном каталоге нет dwg файлов! Программа завершена.")
                 Exit Sub
             End If
         Else
             acEd.WriteMessage(CrLf & "Блоки не выбраны! Программа завершена.")
+            Exit Sub
         End If
 
+        acEd.WriteMessage(CrLf & "В каталоге найдено файлов с блоками: {0}", listBlock.Count)
 
         '' тут читаем dwg файл с блоками и копируем в описание блока атрибуты из файла
+        pm.SetLimit(listBlocksToReplace.Count)
+        pm.Start("Изменение блоков")
+        Dim correctBlock As Integer = 0
+
         For Each i As String In listBlocksToReplace
-
             Dim blockID As ObjectId
-
             Using acTrans As Transaction = acCurDb.TransactionManager.StartTransaction()
                 Dim acBlockTable As BlockTable = CType(acTrans.GetObject(acCurDb.BlockTableId, _
                                                                OpenMode.ForRead), BlockTable)
@@ -165,32 +167,32 @@ Public Class acad__boxashu
                                         End If
                                     End If
 
-
-
-
                                 Catch ex As Autodesk.AutoCAD.Runtime.Exception
-                                    Windows.Forms.MessageBox.Show("Ошибка" + ex.Message)
+                                    acEd.WriteMessage(CrLf & "Ошибка при чтении блока из файла {0}! Программа завершена.", SourcePath)
+                                    acEd.WriteMessage(CrLf & ex.Message)
                                     Exit Sub
                                 End Try
                             Next
-
                             'next prepare to deepclone the recorded ids to the destdb
                             Dim mapping As IdMapping = New IdMapping()
-
                             'now clone the objects into the destdb
                             dbSource.WblockCloneObjects(sourceIds, destDbMsId, mapping, DuplicateRecordCloning.Replace, False)
-
-
                             tm.Commit()
                         End Using
                     End Using
+
                 End If
+                correctBlock = correctBlock + 1
 
             Catch ex As Autodesk.AutoCAD.Runtime.Exception
-                Windows.Forms.MessageBox.Show("Ошибка" + ex.Message)
+                acEd.WriteMessage(CrLf & "Ошибка при изменении блока {0}! Программа завершена.", i)
+                acEd.WriteMessage(CrLf & ex.Message)
                 Exit Sub
             End Try
+            pm.MeterProgress()
         Next
+        pm.Stop()
+        acEd.WriteMessage(CrLf & "Изменено блоков: {0}", correctBlock)
     End Sub
 
 
