@@ -1,4 +1,9 @@
-﻿
+﻿'' bx_blockreplace.vb
+'' © Шульжицкий Владимир, 2014 (boxa.shu@gmail.com)
+'' Назначение: Плагин для AutoCAD, предназначен для добавление атрибутов в блоки .
+'' Заказчик: Александр Чумак <ca@vodeco.ru> <zvezdo4et@list.ru> ООО «ВОДЭКО»  www.vodeco.ru
+'' Команда: bx_blockreplace
+
 Imports Autodesk.AutoCAD.Runtime
 Imports Autodesk.AutoCAD.ApplicationServices
 Imports Autodesk.AutoCAD.EditorInput
@@ -8,10 +13,13 @@ Imports Autodesk.AutoCAD.Windows
 
 Public Class acad__boxashu
     Const CrLf As String = ControlChars.CrLf 'Environment.NewLine'ControlChars.CrLf
+    Private keyWord As String
+
 
     <CommandMethod("bx_blockreplace")> _
     Public Sub bx_blockreplace()
 
+        Me.keyWord = "ABout"
 
         '' Получениеn текущего документа и базы данных
         Dim acDoc As Document = Application.DocumentManager.MdiActiveDocument
@@ -19,8 +27,6 @@ Public Class acad__boxashu
         Dim acEd As Editor = acDoc.Editor
 
         Dim pm As ProgressMeter = New ProgressMeter()
-
-
         'тут лежит список с именами блоков которые нужно поменять
         Dim listBlocksToReplace As New List(Of String)
 
@@ -34,12 +40,21 @@ Public Class acad__boxashu
             acTypValAr.SetValue(New TypedValue(DxfCode.Start, "INSERT"), 0)
             '' Назначение критериев фильтра объекту SelectionFilter
             Dim acSelFtr As SelectionFilter = New SelectionFilter(acTypValAr)
+            'http://www.theswamp.org/index.php?PHPSESSID=avlhqv9o52tm7kiauq62c122j2&topic=31864.0;nowap
+            Dim opt As New PromptSelectionOptions()
+            opt.SetKeywords("[ABout]", "ABout")
+            opt.MessageForAdding = CrLf & "Выберите блоки для замены или " & opt.Keywords.GetDisplayString(True)
+            AddHandler opt.KeywordInput, AddressOf onKeywordInput
+
             '' Запрос выбора объектов в области чертежа
-            Dim acSSPrompt As PromptSelectionResult = acDoc.Editor.GetSelection(acSelFtr)
+            Dim acSSPrompt As PromptSelectionResult = acDoc.Editor.GetSelection(opt, acSelFtr)
+
             '' Если статус запроса равен OK, объекты выбраны
             If acSSPrompt.Status <> PromptStatus.OK Then
                 Exit Sub
             End If
+
+
             Dim acSSet As SelectionSet = acSSPrompt.Value
             '' Перебор объектов в наборе
             For Each acSSObj As SelectedObject In acSSet
@@ -238,5 +253,40 @@ Public Class acad__boxashu
         pm.Stop()
         acEd.WriteMessage(CrLf & "____________________")
         acEd.WriteMessage(CrLf & "Изменено блоков: {0}", correctBlock)
+
+
+ 
+
+    End Sub
+
+    Private Sub onKeywordInput(sender As Object, e As SelectionTextInputEventArgs)
+
+        Dim acDoc As Document = Application.DocumentManager.MdiActiveDocument
+        Dim acEd As Editor = acDoc.Editor
+
+        'Me.keyWord = e.Input
+        'acEd.WriteMessage(ControlChars.CrLf & "Вы ввели: " & e.Input)
+
+
+        acEd.WriteMessage(CrLf & "Программа: bx_blockreplace.")
+        acEd.WriteMessage(CrLf & "Предназначена для сравнения блоков в чертеже, " _
+                               & "с блоками в указанной папке и импортирования атрибутов из блоков " _
+                               & "в папке, в блоки чертежа, при условии совпадения имен блоков. " _
+                               & "Если атрибуты имеются и в блоках чертежа и в блоках в папке то, " _
+                               & "при совпадении имен атрибутов, данный атрибут не будет " _
+                               & "импортирован и об этом будет выведено в консоль автокада " _
+                               & "соответствующее предупреждение.")
+        acEd.WriteMessage(CrLf & "При обнаружении неточности или ошибки просьба" _
+                               & " сообщить автору, по адресу: armspec@gmail.com")
+        acEd.WriteMessage(CrLf & "Для коммерческого использования." _
+                               & " Лицензия на программу принадлежит: ООО «ВОДЭКО»  www.vodeco.ru")
+        acEd.WriteMessage(CrLf & "Количество рабочих мест: неограничено.")
+        acEd.WriteMessage(CrLf & "Стандартное соглашение" _
+                                  & " тут: http://experement.spb.ru/wiki/doku.php?id=programming:lic_pay")
+        acEd.WriteMessage(CrLf & " _ ")
+        acEd.WriteMessage(CrLf & " _ ")
+        acEd.WriteMessage(CrLf & " _ ")
+        acEd.WriteMessage(CrLf & " _ ")
+
     End Sub
 End Class
