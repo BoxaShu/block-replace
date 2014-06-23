@@ -287,6 +287,7 @@ Public Class acad__boxashu
         acEd.WriteMessage(CrLf & " _ ")
         acEd.WriteMessage(CrLf & " _ ")
         acEd.WriteMessage(CrLf & " _ ")
+        acEd.WriteMessage(CrLf & " _ ")
 
     End Sub
 End Class
