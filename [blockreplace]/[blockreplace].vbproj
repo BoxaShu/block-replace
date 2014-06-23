@@ -6,8 +6,8 @@
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProjectGuid>{43F9178C-D8EA-4B04-9C34-166C7A5BB917}</ProjectGuid>
     <OutputType>Library</OutputType>
-    <RootNamespace>_blockreplace_</RootNamespace>
-    <AssemblyName>[blockreplace]</AssemblyName>
+    <RootNamespace>blockreplace</RootNamespace>
+    <AssemblyName>blockreplace</AssemblyName>
     <FileAlignment>512</FileAlignment>
     <MyType>Windows</MyType>
     <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
@@ -23,7 +23,7 @@
     <OutputPath>bin\Debug\</OutputPath>
     <StartAction>Program</StartAction>
     <StartProgram>C:\Program Files\Autodesk\AutoCAD 2014\acad.exe</StartProgram>
-    <DocumentationFile>[blockreplace].xml</DocumentationFile>
+    <DocumentationFile>blockreplace.xml</DocumentationFile>
     <NoWarn>42016,41999,42017,42018,42019,42032,42036,42020,42021,42022</NoWarn>
     <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
@@ -33,7 +33,7 @@
     <DefineTrace>true</DefineTrace>
     <Optimize>true</Optimize>
     <OutputPath>bin\Release\</OutputPath>
-    <DocumentationFile>[blockreplace].xml</DocumentationFile>
+    <DocumentationFile>blockreplace.xml</DocumentationFile>
     <NoWarn>42016,41999,42017,42018,42019,42032,42036,42020,42021,42022</NoWarn>
     <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
